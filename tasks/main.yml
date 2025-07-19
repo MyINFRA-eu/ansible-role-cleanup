@@ -1,7 +1,7 @@
 ---
 #####
 #
-# @name MyINFRA.eu ~ Ansible <name> Role
+# @name MyINFRA.eu ~ Ansible Cleanup Role
 # @version 2025.07.001
 # @since 2025.07.001
 #
@@ -11,20 +11,39 @@
 #
 ###
 #
-# Ansible role for <description>
+# Ansible role to cleanup old backup files created by ansible itself.
 #
 #####
 
 - name: "Copyright & Version information"
   ansible.builtin.debug:
     msg:
-      - "MyINFRA.eu ~ Ansible <name> Role"
-      - "Version   : {{ myinfra.<name>.version }}"
+      - "MyINFRA.eu ~ Ansible Cleanup Role"
+      - "Version   : {{ myinfra.cleanup.version }}"
       - "Copyright : (c) 2025 (and beyond) - Dennis de Houx, All In One, One For The code"
       - "Author    : Dennis de Houx <dennis@dehoux.be>"
       - "License   : https://creativecommons.org/licenses/by-nc-nd/4.0/deed.en CC BY-NC-ND 4.0"
 
-- name: "Load: Gather facts tasks"
-  ansible.builtin.import_tasks: gather.yml
-  tags:
-    - <short_name>_gather_facts
+- name: "CLEANUP > Find old backups"
+  ansible.builtin.find:
+    recurse: no
+    paths:
+      - "{{ cleanup_files | dirname }}"
+    patterns:
+      - "{{ cleanup_files | basename }}"
+    use_regex: true
+  loop: "{{ cleanup_files | default([]) }}"
+  register: cleanup_backup_files
+
+- name: "CLEANUP > Old backups"
+  ansible.builtin.file:
+    src: "{{ cleanup_file }}"
+    state: absent
+  loop: "{{ cleanup_backup_files.files | default([]) }}"
+  register: cleanup_remove_output
+  var:
+    cleanup_file: "{{ item }}"
+    cleanup_latest: "{{ (item | sort(attribute='mtime') | last).path }}"
+  when:
+    - cleanup_file is defined and cleanup_file is not cleanup_latest
+    - cleanup is defined and cleanup is true
